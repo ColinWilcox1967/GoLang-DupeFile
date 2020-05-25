@@ -49,8 +49,12 @@ func main () {
 }
 
 func folderExists (folder string) bool {
+	if _, err := os.Stat(folder); !os.IsNotExist(err) {
+		return true
+	}
 	return false
 }
+
 
 func showError (errorText string, exitApp bool, exitCode int) {
 	
