@@ -44,6 +44,11 @@ func main () {
 	  		showError (tmp, false, 0)
 	  	}
 
+	  	// run through those that exist copying the file to each folder
+	  	for _,fldr := range destinationLocations {
+	  		copyFile (sourceFile, fldr)
+	  	}
+
 		
 	}
 }
@@ -79,8 +84,9 @@ func fileExists (filePath string) bool {
   	return false
 }
 
-func copyFile () {
-	sourceFile, err := os.Open("/var/www/html/src/test.txt")
+// need to return rather than exit
+func copyFile (filepath string, folder string) bool {
+	sourceFile, err := os.Open(filepath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -98,4 +104,6 @@ func copyFile () {
 		log.Fatal(err)
 	}
 	log.Printf("Copied %d bytes.", bytesCopied)
+
+	return true
 }
