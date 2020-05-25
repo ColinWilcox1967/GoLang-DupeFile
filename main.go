@@ -10,6 +10,11 @@ import (
 
 const DUPEFILE_VERSION = "v1.0"
 
+const KErrorNone = 0
+const KErrorProblemOpeningFile = -1
+const KErrorProblemCopyingData = -2
+const KErrorProblemClosingFile = -3
+
 var (
 	sourceFile string
 	destinationLocations []string
@@ -84,26 +89,53 @@ func fileExists (filePath string) bool {
   	return false
 }
 
+func getFileSize (filepath string) (int64, error) {
+	f, err := os.Open(filepath)
+    if err != nil {
+        return 0, err
+    }
+    defer f.Close()
+    fi, err := f.Stat()
+    if err != nil {
+        return 0, err
+    }
+
+    return fi.Size(), nil
+}
+
+
 // need to return rather than exit
-func copyFile (filepath string, folder string) bool {
-	sourceFile, err := os.Open(filepath)
+func copyFile (filename string, folder string) (int, bool) {
+	sourceFile, err := os.Open(filename)
 	if err != nil {
-		log.Fatal(err)
+		// problem opening file
+		return KErrorProblemOpeningFile, false
 	}
 	defer sourceFile.Close()
  
 	// Create new file
-	newFile, err := os.Create("/var/www/html/test.txt")
+	newFilePath := folder
+	if folder[len(folder)-1] != '\\' {
+		newFilePath += "\\" // append a trailing slash
+	}
+	newFilePath += filename
+
+	newFile, err := os.Create(newFilePath)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err) // TODO
 	}
 	defer newFile.Close()
  
-	bytesCopied, err := io.Copy(newFile, sourceFile)
+	bytesCopied, err := io.Copy(sourceFile, newFile)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err) // TODO
 	}
-	log.Printf("Copied %d bytes.", bytesCopied)
-
-	return true
+	
+	var byteCount int64
+	byteCount, _ = getFileSize (filename)
+	if byteCount == bytesCopied {
+		return KErrorNone, true
+	} else {
+		return KErrorProblemCopyingData, false
+	}
 }
