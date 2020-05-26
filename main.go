@@ -5,6 +5,7 @@ import (
 "os"
 "io"
 "strings"
+"sync"
 )
 
 const DUPEFILE_VERSION = "v1.0"
@@ -21,6 +22,7 @@ const (
 var (
 	sourceFile string
 	destinationLocations []string
+	wg sync.WaitGroup
 )
 
 func main () {
@@ -30,7 +32,7 @@ func main () {
 
 	if (count == 1) { // just the appname no args
 		showSyntax ()
-		os.Exit (0)
+		os.Exit (KErrorNone)
 	}
 
 	if (count == 2) {// only appname and file name no target locations
@@ -54,14 +56,20 @@ func main () {
 	  	}
 	}
 
-
+	// setup a waitGroup one thread for each folder
+	wg.Add (len(destinationLocations))
 	if len(destinationLocations) > 0 {// at least one existing folder
 		for i:= 0; i < len(destinationLocations); i++{
-			if _, status := copyFile (sourceFile, destinationLocations[i]); !status {
+			var status = KErrorNone
+			go copyFile (sourceFile, destinationLocations[i], &status)
+			if status != KErrorNone {
 				fmt.Printf ("Problem copying file '%s' to '%s'\n", strings.ToUpper(sourceFile), strings.ToUpper(destinationLocations[i]))
 			}
 		}
 	}
+
+	// wait till all the threads complete
+	wg.Wait ()
 }
 
 func folderExists (folder string) bool {
@@ -111,13 +119,14 @@ func getFileSize (filepath string) (int64, error) {
 
 
 // need to return rather than exit
-func copyFile (filename string, folder string) (int, bool) {
+func copyFile (filename string, folder string, status *int) {
 	fmt.Printf ("Copying %s to '%s'\n", strings.ToUpper(filename), strings.ToUpper(folder))
 
 	sourceFile, err := os.Open(filename)
 	if err != nil {
 		// problem opening file
-		return KErrorProblemOpeningFile, false
+		*status = KErrorProblemOpeningFile
+		return
 	}
 	defer sourceFile.Close()
  
@@ -130,21 +139,27 @@ func copyFile (filename string, folder string) (int, bool) {
 
 	newFile, err := os.Create(newFilePath)
 	if err != nil {
-		return KErrorUnableToWriteToFile, false
+		*status = KErrorUnableToWriteToFile
+		return
 	}
 	defer newFile.Close()
  
 	bytesCopied, err := io.Copy(newFile, sourceFile)
 	if err != nil {
-		return KErrorUnableToWriteData, false
+		*status = KErrorUnableToWriteData
+		return
 	}
 	
 	var byteCount int64
 	byteCount, _ = getFileSize (filename)
 
+	wg.Done ()
+
 	if byteCount == bytesCopied {
-		return KErrorNone, true
+		*status = KErrorNone
+		return
 	} else {
-		return KErrorProblemCopyingData, false
+		*status = KErrorProblemCopyingData 
+		return 
 	}
 }
