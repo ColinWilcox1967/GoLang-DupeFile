@@ -2,7 +2,6 @@ package main
 
 import (
 "fmt"
-"log"
 "os"
 "io"
 "strings"
@@ -10,10 +9,14 @@ import (
 
 const DUPEFILE_VERSION = "v1.0"
 
-const KErrorNone = 0
-const KErrorProblemOpeningFile = -1
-const KErrorProblemCopyingData = -2
-const KErrorProblemClosingFile = -3
+const (
+ 	KErrorNone = 0
+ 	KErrorProblemOpeningFile   = -1
+ 	KErrorProblemCopyingData   = -2
+ 	KErrorProblemClosingFile   = -3
+ 	KErrorUnableToWriteToFile  = -4
+ 	KErrorUnableToWriteData    = -5
+)
 
 var (
 	sourceFile string
@@ -39,6 +42,7 @@ func main () {
 		showError ("Source file not found", true, -2)
 	}
 
+    
     // now copy all the destination locations into an array checking they exist first
 	for i:= 2; i < count; i++ {
 
@@ -48,13 +52,15 @@ func main () {
 	  		tmp := fmt.Sprintf ("Folder '%s' does not exist. Skipping ...", strings.ToUpper (os.Args[i]))
 	  		showError (tmp, false, 0)
 	  	}
+	}
 
-	  	// run through those that exist copying the file to each folder
-	  	for _,fldr := range destinationLocations {
-	  		copyFile (sourceFile, fldr)
-	  	}
 
-		
+	if len(destinationLocations) > 0 {// at least one existing folder
+		for i:= 0; i < len(destinationLocations); i++{
+			if _, status := copyFile (sourceFile, destinationLocations[i]); !status {
+				fmt.Printf ("Problem copying file '%s' to '%s'\n", strings.ToUpper(sourceFile), strings.ToUpper(destinationLocations[i]))
+			}
+		}
 	}
 }
 
@@ -75,7 +81,7 @@ func showError (errorText string, exitApp bool, exitCode int) {
 }
 
 func displayBanner () {
-	fmt.Printf ("DupeFile, file multicopier %s\n\n", DUPEFILE_VERSION)
+	fmt.Printf ("DupeFile, File Multicopier %s\n\n", DUPEFILE_VERSION)
 }
 
 func showSyntax () {
@@ -106,6 +112,8 @@ func getFileSize (filepath string) (int64, error) {
 
 // need to return rather than exit
 func copyFile (filename string, folder string) (int, bool) {
+	fmt.Printf ("Copying %s to '%s'\n", strings.ToUpper(filename), strings.ToUpper(folder))
+
 	sourceFile, err := os.Open(filename)
 	if err != nil {
 		// problem opening file
@@ -122,17 +130,18 @@ func copyFile (filename string, folder string) (int, bool) {
 
 	newFile, err := os.Create(newFilePath)
 	if err != nil {
-		log.Fatal(err) // TODO
+		return KErrorUnableToWriteToFile, false
 	}
 	defer newFile.Close()
  
-	bytesCopied, err := io.Copy(sourceFile, newFile)
+	bytesCopied, err := io.Copy(newFile, sourceFile)
 	if err != nil {
-		log.Fatal(err) // TODO
+		return KErrorUnableToWriteData, false
 	}
 	
 	var byteCount int64
 	byteCount, _ = getFileSize (filename)
+
 	if byteCount == bytesCopied {
 		return KErrorNone, true
 	} else {
